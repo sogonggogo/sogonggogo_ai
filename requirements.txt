@@ -1,0 +1,13 @@
+# AI Module - Voice Recognition & Conversation
+google-cloud-speech==2.26.0
+openai==1.12.0
+python-dotenv==1.0.0
+pyaudio==0.2.14
+
+# API Server
+fastapi==0.109.0
+uvicorn==0.27.0
+pydantic==2.5.0
+
+# Utilities
+python-dateutil==2.8.2
