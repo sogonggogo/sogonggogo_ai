@@ -1,12 +1,12 @@
 """
-대화 관리 모듈 (OpenAI GPT 활용)
+대화 관리 모듈 (Groq API - Llama 활용)
 고객과의 주문 대화를 처리하고 주문 정보를 추출
 """
 import os
 import json
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
-from openai import OpenAI
+from groq import Groq
 from dateutil import parser as date_parser
 
 
@@ -17,9 +17,9 @@ class DialogManager:
         """
         초기화
         Args:
-            api_key: OpenAI API 키
+            api_key: Groq API 키
         """
-        self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+        self.client = Groq(api_key=api_key or os.getenv("GROQ_API_KEY"))
         self.conversation_history: List[Dict[str, str]] = []
         self.order_context: Dict = {}
         self.customer_name: str = ""
@@ -27,20 +27,22 @@ class DialogManager:
         # 시스템 프롬프트
         self.system_prompt = """당신은 고급 디너 주문을 받는 친절한 AI 어시스턴트입니다.
 
-**대화 흐름 (반드시 이 순서로 진행):**
-1. 고객이 디너 추천 요청 → "무슨 기념일인가요?" 질문
-2. 고객이 기념일 언급 → 축하 + 적절한 디너 2개 추천 (예: "프렌치 디너 또는 샴페인 축제 디너는 어떠세요?")
-3. 고객이 디너 선택 → 서빙 스타일 제안 (예: "디럭스 스타일 어떨까요?")
-4. 고객이 서빙 선택 → 주문 내용 확인 (예: "디너는 샴페인 축제 디너, 서빙은 디럭스 스타일로 주문하셨습니다")
-5. 고객이 수정 요청 → 수정 내용 반영 후 전체 주문 다시 확인
-6. 고객이 확인 → "추가로 필요하신 것 있으세요?" 질문
-7. 고객이 "없어요" → 배달 날짜 안내 후 종료
+**절대 규칙: 오직 한국어로만 대화하세요. 영어, 중국어, 일본어, 러시아어, 독일어 등 어떤 외국어 단어도 절대 사용하지 마세요. 모든 단어는 순수 한글로만 표현하세요.**
+
+**대화 흐름:**
+1. 고객이 디너 종류를 물어보면 → 4가지 디너 종류를 간단히 소개하고 "무슨 기념일인가요?" 질문
+2. 고객이 기념일을 먼저 말하면 → 축하 + 기념일에 맞는 디너 2개 추천 (예: "프렌치 디너 또는 샴페인 축제 디너는 어떠세요?")
+3. 고객이 디너를 선택하면 → 서빙 스타일 3가지(심플, 그랜드, 디럭스)를 설명하고 추천
+4. 고객이 서빙을 선택하면 → 주문 내용 전체 확인 (예: "디너는 샴페인 축제 디너, 서빙은 디럭스 스타일로 주문하셨습니다. 맞으시죠?")
+5. 고객이 수정을 요청하면 → 수정 내용 반영 후 전체 주문 다시 확인
+6. 고객이 확인하면 → "바케트빵이나 와인/샴페인 추가하시겠어요?" 또는 "추가로 필요하신 것 있으세요?" 질문
+7. 고객이 "없어요"라고 하면 → 배달 날짜 물어보고 주문 완료
 
 **주문 정보:**
 - 디너 종류: 발렌타인 디너, 프렌치 디너, 잉글리시 디너, 샴페인 축제 디너
-- 서빙 스타일: simple, grand, deluxe
-- 바케트빵: 기본 3개 (변경 가능)
-- 와인/샴페인: 기본 1병 (변경 가능)
+- 서빙 스타일: 심플(simple), 그랜드(grand), 디럭스(deluxe)
+- 바케트빵: 기본 3개 (고객이 원하는 개수로 변경 가능, 1개부터 가능)
+- 와인/샴페인: 기본 1병 (고객이 원하는 개수로 변경 가능, 0개도 가능)
 - 배달 날짜: "내일" → 다음날, "모레" → 2일 후
 
 **대화 규칙:**
@@ -49,6 +51,8 @@ class DialogManager:
 - 고객 이름을 자주 사용하세요
 - 주문 확인 시 전체 내용을 나열하세요
 - 기념일에 진심으로 축하해주세요
+- 고객이 요청한 수량은 그대로 반영하세요 (임의로 변경하지 마세요)
+- 외국어를 절대 사용하지 마세요. 예: richtig(X) → 맞습니다(O), 豪華(X) → 화려한(O)
 
 **주문 정보가 확정되면 다음 JSON을 응답 끝에 추가:**
 [ORDER_DATA]
@@ -94,12 +98,12 @@ class DialogManager:
         # 대화 기록에 추가
         self.conversation_history.append({"role": "user", "content": user_input})
 
-        # GPT API 호출
+        # Groq API 호출 (Llama 3.3 70B 모델 사용)
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="llama-3.3-70b-versatile",
                 messages=self.conversation_history,
-                temperature=0.7,
+                temperature=0.5,  # 더 일관된 응답을 위해 낮춤
                 max_tokens=500
             )
 

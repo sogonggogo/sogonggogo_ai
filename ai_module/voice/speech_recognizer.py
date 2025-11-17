@@ -1,35 +1,39 @@
 """
-음성인식 모듈 (Google Cloud Speech-to-Text)
+음성인식 모듈 (Faster-Whisper - 오픈소스)
 마이크 입력을 받아 텍스트로 변환
 """
 import os
 import io
+import wave
+import tempfile
 import pyaudio
 from typing import Optional
-from google.cloud import speech
+from faster_whisper import WhisperModel
 
 
 class SpeechRecognizer:
     """
-    음성 인식 클래스 (Google Cloud Speech-to-Text)
+    음성 인식 클래스 (Faster-Whisper - 오픈소스)
     """
 
-    def __init__(self, credentials_path: Optional[str] = None):
+    def __init__(self, model_size: str = "base"):
         """
         초기화
         Args:
-            credentials_path: Google Cloud JSON 인증 파일 경로
+            model_size: Whisper 모델 크기 (tiny, base, small, medium, large)
+                       - tiny: 가장 빠름, 정확도 낮음
+                       - base: 빠름, 정확도 괜찮음 (추천)
+                       - small: 중간 속도, 정확도 좋음
+                       - medium/large: 느림, 정확도 높음
         """
-        # 환경변수에서 인증 파일 경로 가져오기
-        if credentials_path:
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
-        elif "GOOGLE_APPLICATION_CREDENTIALS" not in os.environ:
-            # .env에서 설정 안했으면 경고
-            print("⚠️  GOOGLE_APPLICATION_CREDENTIALS 환경변수가 설정되지 않았습니다.")
-            print("   .env 파일에 다음을 추가하세요:")
-            print("   GOOGLE_APPLICATION_CREDENTIALS=config/your-google-key.json")
+        print(f"🔄 Whisper 모델 로딩 중 ({model_size})...")
 
-        self.client = speech.SpeechClient()
+        # CPU 또는 GPU 자동 선택
+        device = "cpu"  # GPU 있으면 "cuda"로 변경 가능
+        compute_type = "int8"  # CPU에서는 int8, GPU에서는 float16
+
+        self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
+        print(f"✅ Whisper 모델 로딩 완료!")
 
         # 오디오 설정
         self.RATE = 16000
@@ -53,26 +57,42 @@ class SpeechRecognizer:
 
         print("🔄 [음성 인식 중...]")
 
-        # Google Cloud STT로 인식
+        # Whisper로 인식
         try:
-            audio = speech.RecognitionAudio(content=audio_data)
-            config = speech.RecognitionConfig(
-                encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-                sample_rate_hertz=self.RATE,
-                language_code="ko-KR",
-                enable_automatic_punctuation=True,
+            # 임시 WAV 파일 생성
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+                temp_path = temp_file.name
+
+                # WAV 파일로 저장
+                with wave.open(temp_path, 'wb') as wf:
+                    wf.setnchannels(1)
+                    wf.setsampwidth(2)  # 16-bit
+                    wf.setframerate(self.RATE)
+                    wf.writeframes(audio_data)
+
+            # Whisper로 인식
+            segments, info = self.model.transcribe(
+                temp_path,
+                language="ko",
+                beam_size=5,
+                vad_filter=True  # 음성 구간만 인식
             )
 
-            response = self.client.recognize(config=config, audio=audio)
-
             # 결과 추출
-            for result in response.results:
-                text = result.alternatives[0].transcript
+            text_parts = []
+            for segment in segments:
+                text_parts.append(segment.text.strip())
+
+            # 임시 파일 삭제
+            os.unlink(temp_path)
+
+            if text_parts:
+                text = " ".join(text_parts)
                 print(f"✅ [인식 완료] {text}")
                 return text
-
-            print("❌ 음성을 인식할 수 없습니다.")
-            return None
+            else:
+                print("❌ 음성을 인식할 수 없습니다.")
+                return None
 
         except Exception as e:
             print(f"❗ 인식 오류: {e}")
@@ -119,29 +139,30 @@ class SpeechRecognizer:
         """
         오디오 파일에서 음성 인식
         Args:
-            audio_file_path: 오디오 파일 경로 (.wav)
+            audio_file_path: 오디오 파일 경로 (.wav, .mp3 등)
         Returns:
             인식된 텍스트 또는 None
         """
         try:
-            with io.open(audio_file_path, "rb") as audio_file:
-                content = audio_file.read()
-
-            audio = speech.RecognitionAudio(content=content)
-            config = speech.RecognitionConfig(
-                encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-                sample_rate_hertz=self.RATE,
-                language_code="ko-KR",
+            # Whisper로 인식
+            segments, info = self.model.transcribe(
+                audio_file_path,
+                language="ko",
+                beam_size=5,
+                vad_filter=True
             )
 
-            response = self.client.recognize(config=config, audio=audio)
+            # 결과 추출
+            text_parts = []
+            for segment in segments:
+                text_parts.append(segment.text.strip())
 
-            for result in response.results:
-                text = result.alternatives[0].transcript
+            if text_parts:
+                text = " ".join(text_parts)
                 print(f"✅ [파일 인식 완료] {text}")
                 return text
-
-            return None
+            else:
+                return None
 
         except Exception as e:
             print(f"❗ 파일 인식 오류: {e}")

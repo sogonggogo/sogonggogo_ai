@@ -5,12 +5,15 @@
 ## 주요 기능
 
 ### 1. 음성인식 모듈 (`ai_module/voice/`)
-- Google Cloud Speech-to-Text API를 사용한 실시간 음성인식
+- **Faster-Whisper** (OpenAI Whisper 오픈소스 모델) 사용
+- 로컬에서 실행, 완전 무료
 - 마이크 입력을 텍스트로 변환
+- 한국어 음성 인식 지원
 
 
 ### 2. 대화 처리 모듈 (`ai_module/conversation/`)
-- **DialogManager**: OpenAI GPT를 활용한 자연어 대화 처리
+- **DialogManager**: Groq API (Llama 3.3 70B)를 활용한 자연어 대화 처리
+  - 오픈소스 LLM 사용 (Meta Llama)
   - 고객의 의도 파악
   - 디너 추천
   - 주문 정보 추출
@@ -30,9 +33,24 @@
 pip install -r requirements.txt
 
 # .env 파일에 API 키 설정
-OPENAI_API_KEY=your_openai_key
-GOOGLE_APPLICATION_CREDENTIALS=config/your-google-key.json
+GROQ_API_KEY=your_groq_api_key  # https://console.groq.com 에서 무료 발급
 ```
+
+**Groq API Key 발급 방법:**
+1. https://console.groq.com 접속
+2. 회원가입/로그인 (무료)
+3. API Keys 메뉴에서 키 생성
+4. .env 파일에 복사
+
+**사용 기술 스택:**
+- 🎤 **음성 인식**: Faster-Whisper (OpenAI Whisper 오픈소스)
+  - 로컬 실행, 완전 무료
+  - GPU 없어도 작동 (CPU 모드 지원)
+
+- 🤖 **대화 AI**: Groq API (Llama 3.3 70B)
+  - Meta의 오픈소스 LLM
+  - Groq의 무료 API 사용
+  - 초고속 추론
 
 ### 2. 서버 실행
 ```bash
