@@ -1,25 +1,29 @@
 """
-대화 관리 모듈 (Groq API - Llama 활용)
+대화 관리 모듈 (vLLM - 로컬 LLM 활용)
 고객과의 주문 대화를 처리하고 주문 정보를 추출
 """
 import os
 import json
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
-from groq import Groq
+from openai import OpenAI
 from dateutil import parser as date_parser
 
 
 class DialogManager:
     """대화 관리 클래스"""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, base_url: Optional[str] = None):
         """
         초기화
         Args:
-            api_key: Groq API 키
+            base_url: vLLM 서버 주소 (기본값: http://localhost:8000/v1)
         """
-        self.client = Groq(api_key=api_key or os.getenv("GROQ_API_KEY"))
+        # vLLM 로컬 서버 연결 (OpenAI API 호환)
+        self.client = OpenAI(
+            base_url=base_url or os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1"),
+            api_key="not-needed"  # 로컬이므로 API 키 불필요
+        )
         self.conversation_history: List[Dict[str, str]] = []
         self.order_context: Dict = {}
         self.customer_name: str = ""
@@ -98,10 +102,10 @@ class DialogManager:
         # 대화 기록에 추가
         self.conversation_history.append({"role": "user", "content": user_input})
 
-        # Groq API 호출 (Llama 3.3 70B 모델 사용)
+        # vLLM 로컬 API 호출
         try:
             response = self.client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="local-model",  # vLLM은 단일 모델 서빙이므로 이름 무관
                 messages=self.conversation_history,
                 temperature=0.5,  # 더 일관된 응답을 위해 낮춤
                 max_tokens=500

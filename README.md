@@ -12,14 +12,16 @@
 
 
 ### 2. 대화 처리 모듈 (`ai_module/conversation/`)
-- **DialogManager**: Groq API (Llama 3.3 70B)를 활용한 자연어 대화 처리
-  - 오픈소스 LLM 사용 (Meta Llama)
+- **DialogManager**: vLLM (로컬 LLM 서버)을 활용한 자연어 대화 처리
+  - 완전 무료, 로컬 실행 (외부 API 호출 없음)
+  - 오픈소스 LLM 사용 (Llama-3-Korean, EEVE 등)
   - 순수 한국어 대화 지원 (외국어 혼용 방지)
   - 고객의 의도 파악
   - 디너 추천 및 서빙 스타일 제안
   - 주문 정보 추출 (JSON 형식)
   - 자연스러운 대화 흐름 관리
   - 배달 날짜 확정 시 자동 주문 완료
+  - RTX 4060 8GB VRAM 최적화
 
 - **OrderProcessor**: 주문 데이터 관리
   - 주문 생성
@@ -85,3 +87,71 @@ POST /api/order/finalize/{session_id}
   "status": "confirmed"
 }
 ```
+
+## 설치 및 실행 가이드
+
+### 1. 패키지 설치
+```bash
+pip install -r requirements.txt
+```
+
+### 2. vLLM 로컬 서버 실행
+
+**필수:** FastAPI 서버를 실행하기 전에 vLLM 서버를 먼저 실행해야 합니다.
+
+```bash
+# RTX 4060 8GB 최적화 설정
+vllm serve beomi/Llama-3-Open-Ko-8B \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --dtype half \
+  --max-model-len 2048 \
+  --gpu-memory-utilization 0.9
+```
+
+자세한 설정 방법은 [VLLM_SETUP_GUIDE.md](VLLM_SETUP_GUIDE.md)를 참고하세요.
+
+### 3. FastAPI 서버 실행
+```bash
+uvicorn main:app --reload --port 8080
+```
+
+**주의:** vLLM 서버(8000번 포트)와 FastAPI 서버(8080번 포트)는 다른 포트를 사용합니다.
+
+---
+
+## 비용 및 라이선스
+
+### ✅ 완전 무료
+- **음성인식**: Faster-Whisper (오픈소스, 로컬)
+- **대화 처리**: vLLM + 오픈소스 LLM (로컬)
+- **외부 API 호출**: 없음
+- **비용**: 0원 (전기세/서버 비용만)
+
+### 🔒 프라이버시
+- 모든 데이터가 로컬에서만 처리
+- 외부 서버로 전송 없음
+- 완벽한 프라이버시 보장
+
+---
+
+## 시스템 요구사항
+
+### 최소 사양
+- Python 3.8 이상
+- CPU: 멀티코어 프로세서
+- RAM: 16GB 이상
+- GPU: 선택사항 (CPU만으로도 가능하지만 느림)
+
+### 권장 사양 (RTX 4060 8GB 기준)
+- Python 3.10 이상
+- GPU: NVIDIA RTX 4060 8GB
+- RAM: 16GB 이상
+- CUDA: 11.8 이상
+- 응답 속도: 1-3초
+
+---
+
+## 문제 해결
+
+문제가 발생하면 [VLLM_SETUP_GUIDE.md](VLLM_SETUP_GUIDE.md)의 트러블슈팅 섹션을 참고하세요.

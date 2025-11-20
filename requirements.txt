@@ -1,6 +1,7 @@
 # AI Module - Voice Recognition & Conversation
 faster-whisper==1.0.3
-groq==0.14.0
+vllm==0.6.3.post1
+openai==1.54.3  # vLLM은 OpenAI API 호환 (로컬 실행, 무료)
 python-dotenv==1.0.0
 pyaudio==0.2.14
 
