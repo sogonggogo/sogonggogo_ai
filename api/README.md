@@ -22,19 +22,6 @@ api/
 └── README.md
 ```
 
-## 실행 방법
-
-### 1. 서버 시작
-
-```bash
-cd api
-python run.py
-```
-
-### 2. 접속
-
-- **서버**: http://localhost:8000
-- **API 문서**: http://localhost:8000/docs (Swagger UI)
 
 ## API 엔드포인트
 
@@ -56,6 +43,3 @@ python run.py
 - **GET** `/api/health`
 - Response: `{ "status": "healthy", "active_sessions": 0 }`
 
-## 상세 문서
-
-자세한 API 명세는 [API_SPEC.md](../API_SPEC.md) 참고
