@@ -74,3 +74,6 @@ docs/_build/
 *.wav
 *.mp3
 *.ogg
+
+# 파인튜닝 모델 제외
+dinner_bot_final
