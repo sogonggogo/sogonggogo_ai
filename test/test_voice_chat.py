@@ -1,6 +1,6 @@
 """
-음성 인식 + LLM 대화 테스트 스크립트
-마이크로 음성 입력 받아서 GPT와 대화
+음성 인식 + 베이스 모델 대화 테스트 스크립트
+마이크로 음성 입력 받아서 디너 봇과 대화
 """
 import os
 import sys
@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 # UTF-8 출력 설정
 if sys.platform == 'win32':
     import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'ignore')
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'ignore')
 
 # 프로젝트 루트 경로 (test 폴더의 상위 디렉토리)
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,31 +28,35 @@ from ai_module.conversation.dialog_manager import DialogManager
 def main():
     """메인 함수"""
     print("\n" + "="*60)
-    print("    [음성 인식 + GPT 대화 테스트]")
+    print("    [음성 인식 + Groq API 대화 테스트]")
     print("="*60 + "\n")
 
-    # 환경 변수 확인
-    if not os.getenv("GROQ_API_KEY"):
-        print("[X] 오류: GROQ_API_KEY 환경 변수가 설정되지 않았습니다.")
-        print("   .env 파일을 확인하세요.")
-        return
+    print("[알림] Groq API 사용")
+    print("       - 음성 인식: Groq Whisper API (whisper-large-v3-turbo)")
+    print("       - 대화 모델: Llama 3.3 70B (Groq API)")
+    print("       - GPU 불필요 (클라우드 기반)\n")
 
-    print("[OK] 환경 변수 확인 완료\n")
-
-    # 음성 인식기 초기화
+    # 음성 인식기 초기화 (Groq Whisper API)
     try:
-        speech_recognizer = SpeechRecognizer(model_size="base")
-        print("[OK] Whisper 음성 인식 초기화 완료")
+        speech_recognizer = SpeechRecognizer()
+        print("[OK] Groq Whisper API 음성 인식 초기화 완료")
     except Exception as e:
         print(f"[X] 음성 인식기 초기화 실패: {e}")
+        print("\n[해결 방법]")
+        print("1. .env 파일에 GROQ_API_KEY가 설정되어 있는지 확인")
+        print("2. https://console.groq.com/keys 에서 API 키 발급")
         return
 
-    # 대화 관리자 초기화
+    # 대화 관리자 초기화 (Groq API)
     try:
+        print("[로딩] Groq API 연결 중...")
         dialog_manager = DialogManager()
-        print("[OK] Groq Llama 초기화 완료\n")
+        print("[OK] Groq 디너 봇 초기화 완료\n")
     except Exception as e:
         print(f"[X] 대화 관리자 초기화 실패: {e}")
+        print("\n[해결 방법]")
+        print("1. .env 파일에 GROQ_API_KEY가 설정되어 있는지 확인")
+        print("2. 인터넷 연결 확인")
         return
 
     # 마이크 테스트
@@ -68,15 +72,15 @@ def main():
     if not customer_name:
         customer_name = "테스트 고객"
 
-    print("\n" + "="*60)
+    print("\n" + "="*60, flush=True)
     greeting = dialog_manager.start_conversation(customer_name)
-    print(f"\n시스템: {greeting}\n")
-    print("="*60)
+    print(f"\n시스템: {greeting}\n", flush=True)
+    print("="*60, flush=True)
 
     print("\n[사용 방법]")
-    print("   - 각 턴마다 음성으로 대화합니다")
-    print("   - 'q' 또는 'quit' 입력 시 종료")
-    print("   - Ctrl+C로도 종료 가능")
+    print("   - 각 턴마다 v (음성) / t (텍스트) / q (종료) 선택")
+    print("   - 음성 입력 시 녹음 시간 입력 (예: 5)")
+    print("   - Ctrl+C로 종료")
     print("\n" + "="*60 + "\n")
 
     # 대화 루프
@@ -85,45 +89,39 @@ def main():
         try:
             print(f"\n[ 턴 {turn} ]")
 
-            # 사용자 입력 선택 (음성 or 텍스트)
-            input_choice = input("음성 입력(v) / 텍스트 입력(t) / 종료(q): ").strip().lower()
+            # 입력 모드 선택
+            mode = input("입력 방법 선택 (v=음성 / t=텍스트 / q=종료): ").strip().lower()
 
-            if input_choice in ['q', 'quit', 'exit']:
-                print("\n[종료] 대화를 종료합니다.")
+            if mode == 'q':
+                print("\n[종료] 사용자가 종료했습니다.")
                 break
 
-            user_input = None
+            elif mode == 'v':
+                # 녹음 시간 입력
+                duration_input = input("녹음 시간 (초, 기본 5초): ").strip()
+                duration = int(duration_input) if duration_input.isdigit() else 5
 
-            if input_choice == 'v':
                 # 음성 입력
-                duration = input("녹음 시간(초, 기본 5초): ").strip()
-                duration = int(duration) if duration.isdigit() else 5
-
                 user_input = speech_recognizer.recognize_from_microphone(duration=duration)
 
                 if not user_input:
                     print("[X] 음성을 인식할 수 없습니다. 다시 시도하세요.")
                     continue
 
-            elif input_choice == 't':
+            elif mode == 't':
                 # 텍스트 입력
-                user_input = input("[사용자] 입력: ").strip()
-
+                user_input = input("\n사용자 입력: ").strip()
                 if not user_input:
-                    print("[X] 입력이 비어있습니다.")
+                    print("[X] 입력이 비어있습니다. 다시 시도하세요.")
                     continue
 
-                if user_input.lower() in ['q', 'quit', 'exit']:
-                    print("\n[종료] 대화를 종료합니다.")
-                    break
-
             else:
-                print("[X] 잘못된 선택입니다. v, t, q 중 하나를 입력하세요.")
+                print("[X] 잘못된 입력입니다. v, t, q 중 하나를 선택하세요.")
                 continue
 
             print(f"\n[사용자] {user_input}")
 
-            # GPT 응답 생성
+            # AI 응답 생성
             print("\n[처리중] AI가 생각하는 중...")
             response, order_data = dialog_manager.process_user_input(user_input)
 
@@ -152,7 +150,9 @@ def main():
 
         except Exception as e:
             print(f"\n[X] 오류 발생: {e}")
-            print("계속 진행하려면 Enter를 누르세요...")
+            import traceback
+            traceback.print_exc()
+            print("\n계속 진행하려면 Enter를 누르세요...")
             input()
 
     # 최종 주문 요약
@@ -168,6 +168,6 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print(f"\n❌ 프로그램 오류: {e}")
+        print(f"\n[X] 프로그램 오류: {e}")
         import traceback
         traceback.print_exc()

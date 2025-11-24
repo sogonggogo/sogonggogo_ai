@@ -1,6 +1,6 @@
 """
-텍스트 입력 + LLM 대화 테스트 스크립트
-(음성 인식 없이 텍스트로만 GPT와 대화 - Google Cloud 인증 불필요)
+텍스트 입력 + 베이스 모델 대화 테스트 스크립트
+(음성 인식 없이 텍스트로만 디너 봇과 대화)
 """
 import os
 import sys
@@ -27,18 +27,12 @@ from ai_module.conversation.dialog_manager import DialogManager
 def main():
     """메인 함수"""
 
-    # 환경 변수 확인
-    if not os.getenv("GROQ_API_KEY"):
-        print("[X] 오류: GROQ_API_KEY 환경 변수가 설정되지 않았습니다.")
-        print("   .env 파일을 확인하세요.")
-        return
-
-
-    # 대화 관리자 초기화
+    # 대화 관리자 초기화 (베이스 모델 로드)
     try:
+        print("\n베이스 모델 로드 중... ")
         dialog_manager = DialogManager()
     except Exception as e:
-        print(f"[X] 대화 관리자 초기화 실패: {e}")
+        print(f"초기화 실패: {e}")
         import traceback
         traceback.print_exc()
         return
@@ -72,7 +66,7 @@ def main():
                 print("\n[종료] 대화를 종료합니다.")
                 break
 
-            # GPT 응답 생성
+            # 베이스 모델 응답 생성
             response, order_data = dialog_manager.process_user_input(user_input)
 
             print(f"\n시스템: {response}")

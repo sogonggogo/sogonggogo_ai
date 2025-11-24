@@ -1,39 +1,33 @@
 """
-음성인식 모듈 (Faster-Whisper - 오픈소스)
+음성인식 모듈 (Groq Whisper API)
 마이크 입력을 받아 텍스트로 변환
 """
 import os
-import io
-import wave
 import tempfile
+import wave
 import pyaudio
 from typing import Optional
-from faster_whisper import WhisperModel
+from groq import Groq
 
 
 class SpeechRecognizer:
     """
-    음성 인식 클래스 (Faster-Whisper - 오픈소스)
+    음성 인식 클래스 (Groq Whisper API)
     """
 
-    def __init__(self, model_size: str = "base"):
+    def __init__(self, api_key: Optional[str] = None):
         """
         초기화
         Args:
-            model_size: Whisper 모델 크기 (tiny, base, small, medium, large)
-                       - tiny: 가장 빠름, 정확도 낮음
-                       - base: 빠름, 정확도 괜찮음 (추천)
-                       - small: 중간 속도, 정확도 좋음
-                       - medium/large: 느림, 정확도 높음
+            api_key: Groq API 키 (None이면 환경변수에서 로드)
         """
-        print(f"🔄 Whisper 모델 로딩 중 ({model_size})...")
+        # API 키 로드
+        self.api_key = api_key or os.getenv("GROQ_API_KEY")
+        if not self.api_key:
+            raise ValueError("GROQ_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.")
 
-        # CPU 또는 GPU 자동 선택
-        device = "cpu"  # GPU 있으면 "cuda"로 변경 가능
-        compute_type = "int8"  # CPU에서는 int8, GPU에서는 float16
-
-        self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
-        print(f"✅ Whisper 모델 로딩 완료!")
+        # Groq 클라이언트 초기화
+        self.client = Groq(api_key=self.api_key)
 
         # 오디오 설정
         self.RATE = 16000
@@ -55,9 +49,7 @@ class SpeechRecognizer:
         if not audio_data:
             return None
 
-        print("🔄 [음성 인식 중...]")
-
-        # Whisper로 인식
+        # Groq Whisper API로 인식
         try:
             # 임시 WAV 파일 생성
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
@@ -70,24 +62,21 @@ class SpeechRecognizer:
                     wf.setframerate(self.RATE)
                     wf.writeframes(audio_data)
 
-            # Whisper로 인식
-            segments, info = self.model.transcribe(
-                temp_path,
-                language="ko",
-                beam_size=5,
-                vad_filter=True  # 음성 구간만 인식
-            )
-
-            # 결과 추출
-            text_parts = []
-            for segment in segments:
-                text_parts.append(segment.text.strip())
+            # Groq Whisper API 호출
+            with open(temp_path, "rb") as audio_file:
+                transcription = self.client.audio.transcriptions.create(
+                    file=(temp_path, audio_file.read()),
+                    model="whisper-large-v3-turbo",
+                    language="ko",
+                    temperature=0.0,
+                    prompt="디너, 주문, 추천, 생일, 샴페인, 발렌타인, 프렌치, 잉글리시"
+                )
 
             # 임시 파일 삭제
             os.unlink(temp_path)
 
-            if text_parts:
-                text = " ".join(text_parts)
+            if transcription.text:
+                text = transcription.text.strip()
                 print(f"✅ [인식 완료] {text}")
                 return text
             else:
@@ -96,6 +85,11 @@ class SpeechRecognizer:
 
         except Exception as e:
             print(f"❗ 인식 오류: {e}")
+            if 'temp_path' in locals():
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
             return None
 
     def _record_audio(self, duration: int) -> Optional[bytes]:
@@ -144,21 +138,18 @@ class SpeechRecognizer:
             인식된 텍스트 또는 None
         """
         try:
-            # Whisper로 인식
-            segments, info = self.model.transcribe(
-                audio_file_path,
-                language="ko",
-                beam_size=5,
-                vad_filter=True
-            )
+            # Groq Whisper API 호출
+            with open(audio_file_path, "rb") as audio_file:
+                transcription = self.client.audio.transcriptions.create(
+                    file=(audio_file_path, audio_file.read()),
+                    model="whisper-large-v3-turbo",
+                    language="ko",
+                    temperature=0.0,
+                    prompt="디너, 주문, 추천, 생일, 샴페인, 발렌타인, 프렌치, 잉글리시"
+                )
 
-            # 결과 추출
-            text_parts = []
-            for segment in segments:
-                text_parts.append(segment.text.strip())
-
-            if text_parts:
-                text = " ".join(text_parts)
+            if transcription.text:
+                text = transcription.text.strip()
                 print(f"✅ [파일 인식 완료] {text}")
                 return text
             else:

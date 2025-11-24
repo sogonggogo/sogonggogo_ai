@@ -1,77 +1,61 @@
 """
-대화 관리 모듈 (vLLM - 로컬 LLM 활용)
+대화 관리 모듈 (Groq API + Llama 사용)
 고객과의 주문 대화를 처리하고 주문 정보를 추출
 """
 import os
 import json
+import re
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
-from openai import OpenAI
 from dateutil import parser as date_parser
+from groq import Groq
 
 
 class DialogManager:
-    """대화 관리 클래스"""
+    """대화 관리 클래스 (Groq API)"""
 
-    def __init__(self, base_url: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None):
         """
         초기화
         Args:
-            base_url: vLLM 서버 주소 (기본값: http://localhost:8000/v1)
+            api_key: Groq API 키 (None이면 환경변수에서 로드)
         """
-        # vLLM 로컬 서버 연결 (OpenAI API 호환)
-        self.client = OpenAI(
-            base_url=base_url or os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1"),
-            api_key="not-needed"  # 로컬이므로 API 키 불필요
-        )
+
+        # API 키 로드
+        self.api_key = api_key or os.getenv("GROQ_API_KEY")
+        if not self.api_key:
+            raise ValueError("GROQ_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.")
+
+        # Groq 클라이언트 초기화
+        self.client = Groq(api_key=self.api_key)
+
+        # 사용할 모델 (Llama 3.3 70B - 가장 강력함)
+        self.model_name = "llama-3.3-70b-versatile"
+
         self.conversation_history: List[Dict[str, str]] = []
         self.order_context: Dict = {}
         self.customer_name: str = ""
 
-        # 시스템 프롬프트
-        self.system_prompt = """당신은 고급 디너 주문을 받는 친절한 AI 어시스턴트입니다.
+        # 시스템 프롬프트 파일에서 로드
+        self.system_prompt = self._load_system_prompt()
 
-**절대 규칙: 오직 한국어로만 대화하세요. 영어, 중국어, 일본어, 러시아어, 독일어 등 어떤 외국어 단어도 절대 사용하지 마세요. 모든 단어는 순수 한글로만 표현하세요.**
+    def _load_system_prompt(self) -> str:
+        """
+        시스템 프롬프트를 파일에서 로드
+        Returns:
+            시스템 프롬프트 문자열
+        """
+        # 현재 파일의 디렉토리 경로
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        prompt_path = os.path.join(current_dir, "system_prompt.txt")
 
-**대화 흐름:**
-1. 고객이 디너 종류를 물어보면 → 4가지 디너 종류를 간단히 소개하고 "무슨 기념일인가요?" 질문
-2. 고객이 기념일을 먼저 말하면 → 축하 + 기념일에 맞는 디너 2개 추천 (예: "프렌치 디너 또는 샴페인 축제 디너는 어떠세요?")
-3. 고객이 디너를 선택하면 → 서빙 스타일 3가지(심플, 그랜드, 디럭스)를 설명하고 추천
-4. 고객이 서빙을 선택하면 → 주문 내용 전체 확인 (예: "디너는 샴페인 축제 디너, 서빙은 디럭스 스타일로 주문하셨습니다. 맞으시죠?")
-5. 고객이 수정을 요청하면 → 수정 내용 반영 후 전체 주문 다시 확인
-6. 고객이 확인하면 → "바케트빵이나 와인/샴페인 추가하시겠어요?" 또는 "추가로 필요하신 것 있으세요?" 질문
-7. 고객이 "없어요"라고 하면 → 배달 날짜 물어보고 주문 완료
-
-**주문 정보:**
-- 디너 종류: 발렌타인 디너, 프렌치 디너, 잉글리시 디너, 샴페인 축제 디너
-- 서빙 스타일: 심플(simple), 그랜드(grand), 디럭스(deluxe)
-- 바케트빵: 기본 3개 (고객이 원하는 개수로 변경 가능, 1개부터 가능)
-- 와인/샴페인: 기본 1병 (고객이 원하는 개수로 변경 가능, 0개도 가능)
-- 배달 날짜: "내일" → 다음날, "모레" → 2일 후
-
-**대화 규칙:**
-- 한 번에 한 가지만 질문하세요
-- 짧고 명확하게 응답하세요 (1-2문장)
-- 고객 이름을 자주 사용하세요
-- 주문 확인 시 전체 내용을 나열하세요
-- 기념일에 진심으로 축하해주세요
-- 고객이 요청한 수량은 그대로 반영하세요 (임의로 변경하지 마세요)
-- 외국어를 절대 사용하지 마세요. 예: richtig(X) → 맞습니다(O), 豪華(X) → 화려한(O)
-
-**주문 정보가 확정되면 다음 JSON을 응답 끝에 추가:**
-[ORDER_DATA]
-{
-    "dinner_type": "샴페인 축제 디너",
-    "serving_style": "deluxe",
-    "baguette_count": 6,
-    "wine_count": 0,
-    "champagne_count": 2,
-    "delivery_date": "2025-11-04"
-}
-[/ORDER_DATA]
-
-**중요:** 디너 종류와 서빙 스타일이 모두 결정된 직후에는 반드시 ORDER_DATA를 포함하세요.
-"""
+        try:
+            with open(prompt_path, "r", encoding="utf-8") as f:
+                return f.read()
+        except FileNotFoundError:
+            raise FileNotFoundError(f"시스템 프롬프트 파일을 찾을 수 없습니다: {prompt_path}")
+        except Exception as e:
+            raise Exception(f"시스템 프롬프트 로드 중 오류 발생: {e}")
 
     def start_conversation(self, customer_name: str) -> str:
         """
@@ -82,12 +66,9 @@ class DialogManager:
             인사 메시지
         """
         self.customer_name = customer_name
-        self.conversation_history = [
-            {"role": "system", "content": self.system_prompt}
-        ]
+        self.conversation_history = []
 
         greeting = f"안녕하세요, {customer_name} 고객님, 어떤 디너를 주문하시겠습니까?"
-        self.conversation_history.append({"role": "assistant", "content": greeting})
 
         return greeting
 
@@ -99,23 +80,61 @@ class DialogManager:
         Returns:
             (응답 메시지, 추출된 주문 정보 또는 None)
         """
-        # 대화 기록에 추가
-        self.conversation_history.append({"role": "user", "content": user_input})
-
-        # vLLM 로컬 API 호출
         try:
-            response = self.client.chat.completions.create(
-                model="local-model",  # vLLM은 단일 모델 서빙이므로 이름 무관
-                messages=self.conversation_history,
-                temperature=0.5,  # 더 일관된 응답을 위해 낮춤
-                max_tokens=500
+            # 고객 이름과 주문 컨텍스트를 시스템 프롬프트에 추가
+            current_system_prompt = self.system_prompt
+
+            # 현재 날짜 추가
+            today = datetime.now()
+            tomorrow = today + timedelta(days=1)
+            current_system_prompt += f"\n\n**오늘 날짜:** {today.strftime('%Y년 %m월 %d일')} ({today.strftime('%Y-%m-%d')})\n"
+            current_system_prompt += f"**내일 날짜:** {tomorrow.strftime('%Y년 %m월 %d일')} ({tomorrow.strftime('%Y-%m-%d')})\n"
+
+            # 고객 이름 추가
+            if self.customer_name:
+                current_system_prompt += f"\n**현재 고객:** {self.customer_name}\n"
+
+            # 주문 컨텍스트 추가
+            if self.order_context:
+                order_info = "\n**현재 주문 상태:**\n"
+                for key, value in self.order_context.items():
+                    if value:
+                        order_info += f"- {key}: {value}\n"
+                current_system_prompt += order_info
+
+            # 메시지 구성
+            messages = [
+                {"role": "system", "content": current_system_prompt}
+            ]
+
+            # 대화 히스토리 추가 (최근 6개 턴만)
+            for msg in self.conversation_history[-6:]:
+                messages.append(msg)
+
+            # 현재 사용자 입력 추가
+            messages.append({"role": "user", "content": user_input})
+
+            # Groq API 호출
+            chat_completion = self.client.chat.completions.create(
+                messages=messages,
+                model=self.model_name,
+                temperature=0.3,  # 낮춰서 더 일관된 출력
+                max_tokens=200,   # 짧게 답변하도록
+                top_p=0.9,
             )
 
-            assistant_message = response.choices[0].message.content
+            assistant_message = chat_completion.choices[0].message.content.strip()
+
+            # 대화 기록에 추가
+            self.conversation_history.append({"role": "user", "content": user_input})
             self.conversation_history.append({"role": "assistant", "content": assistant_message})
 
             # 주문 정보 추출
             order_data = self._extract_order_data(assistant_message)
+
+            # 주문 컨텍스트 업데이트
+            if order_data:
+                self.update_order_context(order_data)
 
             # 주문 데이터 부분 제거한 깨끗한 응답
             clean_response = assistant_message.split("[ORDER_DATA]")[0].strip()
@@ -130,7 +149,7 @@ class DialogManager:
         """
         메시지에서 주문 데이터 추출
         Args:
-            message: GPT 응답 메시지
+            message: 응답 메시지
         Returns:
             주문 데이터 딕셔너리 또는 None
         """
@@ -155,21 +174,62 @@ class DialogManager:
     def _parse_date(self, date_str: str) -> Optional[datetime]:
         """
         날짜 문자열을 datetime으로 변환
-        '내일', '모레' 등 상대적 표현도 처리
+        '내일', '모레' 등 상대적 표현과 시간 정보도 처리
         """
-        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = datetime.now()
+        base_date = None
 
-        if "내일" in date_str:
-            return today + timedelta(days=1)
-        elif "모레" in date_str:
-            return today + timedelta(days=2)
+        # 1. 기본 날짜 결정 (시간은 00:00:00으로 초기화)
+        if "모레" in date_str:
+            base_date = today.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=2)
+        elif "내일" in date_str:
+            base_date = today.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
         elif "오늘" in date_str:
-            return today
+            base_date = today.replace(hour=0, minute=0, second=0, microsecond=0)
         else:
+            # 특정 날짜 형식 시도
             try:
-                return date_parser.parse(date_str)
+                base_date = date_parser.parse(date_str, fuzzy=True)
             except:
                 return None
+
+        if not base_date:
+            return None
+
+        # 2. 시간 정보 추출
+        hour = None
+        minute = 0
+
+        # "18시", "18시까지", "18:00", "오후 6시" 등의 패턴 매칭
+        time_patterns = [
+            r'(\d{1,2})시',           # 18시
+            r'(\d{1,2}):(\d{2})',     # 18:00
+            r'오후\s*(\d{1,2})시?',    # 오후 6시
+            r'오전\s*(\d{1,2})시?',    # 오전 6시
+        ]
+
+        for pattern in time_patterns:
+            match = re.search(pattern, date_str)
+            if match:
+                if '오후' in date_str:
+                    hour = int(match.group(1))
+                    if hour != 12:
+                        hour += 12
+                elif '오전' in date_str:
+                    hour = int(match.group(1))
+                    if hour == 12:
+                        hour = 0
+                else:
+                    hour = int(match.group(1))
+                    if len(match.groups()) > 1:  # "18:00" 형식
+                        minute = int(match.group(2))
+                break
+
+        # 3. 시간 정보가 있으면 적용
+        if hour is not None:
+            base_date = base_date.replace(hour=hour, minute=minute)
+
+        return base_date
 
     def update_order_context(self, order_data: Dict):
         """주문 컨텍스트 업데이트"""
@@ -181,16 +241,48 @@ class DialogManager:
             return "아직 주문 정보가 없습니다."
 
         summary_parts = []
+
+        # 기본 정보
         if "dinner_type" in self.order_context:
             summary_parts.append(f"디너: {self.order_context['dinner_type']}")
         if "serving_style" in self.order_context:
             summary_parts.append(f"서빙: {self.order_context['serving_style']} 스타일")
-        if "baguette_count" in self.order_context:
-            summary_parts.append(f"바케트빵: {self.order_context['baguette_count']}개")
+
+        # 모든 디너 공통 - 스테이크
+        if "steak_count" in self.order_context and self.order_context["steak_count"] > 0:
+            summary_parts.append(f"스테이크: {self.order_context['steak_count']}개")
+
+        # Valentine Dinner 항목
         if "wine_count" in self.order_context and self.order_context["wine_count"] > 0:
-            summary_parts.append(f"와인: {self.order_context['wine_count']}병")
+            summary_parts.append(f"와인: {self.order_context['wine_count']}잔")
+        if "napkin_count" in self.order_context and self.order_context["napkin_count"] > 0:
+            summary_parts.append(f"냅킨: {self.order_context['napkin_count']}개")
+
+        # French Dinner 항목
+        if "coffee_cup_count" in self.order_context and self.order_context["coffee_cup_count"] > 0:
+            summary_parts.append(f"커피: {self.order_context['coffee_cup_count']}잔")
+        if "salad_count" in self.order_context and self.order_context["salad_count"] > 0:
+            summary_parts.append(f"샐러드: {self.order_context['salad_count']}인분")
+
+        # English Dinner 항목
+        if "egg_scramble_count" in self.order_context and self.order_context["egg_scramble_count"] > 0:
+            summary_parts.append(f"에그 스크램블: {self.order_context['egg_scramble_count']}인분")
+        if "bacon_count" in self.order_context and self.order_context["bacon_count"] > 0:
+            summary_parts.append(f"베이컨: {self.order_context['bacon_count']}인분")
+        if "bread_count" in self.order_context and self.order_context["bread_count"] > 0:
+            summary_parts.append(f"빵: {self.order_context['bread_count']}개")
+
+        # Champagne Festival Dinner 항목
         if "champagne_count" in self.order_context and self.order_context["champagne_count"] > 0:
             summary_parts.append(f"샴페인: {self.order_context['champagne_count']}병")
+        if "baguette_count" in self.order_context:
+            summary_parts.append(f"바게트빵: {self.order_context['baguette_count']}개")
+        if "coffee_pot_count" in self.order_context and self.order_context["coffee_pot_count"] > 0:
+            summary_parts.append(f"커피: {self.order_context['coffee_pot_count']}포트")
+
+        # 인원수 정보
+        if "serves_count" in self.order_context:
+            summary_parts.append(f"{self.order_context['serves_count']}인분")
 
         return ", ".join(summary_parts)
 
