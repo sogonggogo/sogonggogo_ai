@@ -1,6 +1,7 @@
 """
 Chat API Routes
 """
+from datetime import datetime
 from fastapi import APIRouter, HTTPException
 
 from ..models.chat import (
@@ -62,6 +63,16 @@ async def send_message(request: ChatMessageRequest):
 
         # AI 응답 생성
         response_text, order_data = dialog_manager.process_user_input(user_text)
+
+        # order_data의 datetime 객체를 문자열로 변환 (JSON 직렬화를 위해)
+        if order_data and "delivery_date" in order_data and order_data["delivery_date"]:
+            if isinstance(order_data["delivery_date"], datetime):
+                delivery_dt = order_data["delivery_date"]
+                # 시간이 00:00:00이면 날짜만, 아니면 날짜와 시간 모두 포함
+                if delivery_dt.hour == 0 and delivery_dt.minute == 0:
+                    order_data["delivery_date"] = delivery_dt.strftime("%Y-%m-%d")
+                else:
+                    order_data["delivery_date"] = delivery_dt.strftime("%Y-%m-%d %H:%M")
 
         # 주문 완료 여부 확인
         is_completed = False

@@ -1,3 +1,3 @@
 """
-Dinner Bot Voice API Application
+Dinner Bot Chat API Application
 """

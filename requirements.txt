@@ -1,6 +1,5 @@
 # AI Module
 python-dotenv==1.0.0
-# pyaudio==0.2.14  # 프론트엔드에서 음성 인식 처리하므로 불필요
 
 # API Server
 fastapi==0.109.0

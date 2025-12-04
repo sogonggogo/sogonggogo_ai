@@ -5,8 +5,12 @@ DialogManager와 데이터 모델을 연결하여 실제 주문 객체 생성
 import uuid
 from datetime import datetime
 from typing import Dict, Optional
+from zoneinfo import ZoneInfo
 import sys
 import os
+
+# 한국 타임존 설정
+KST = ZoneInfo("Asia/Seoul")
 
 # 상위 디렉토리의 모듈 import를 위한 경로 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -52,7 +56,7 @@ class OrderProcessor:
                 print(f"오류: '{serving_style_str}'는 유효한 서빙 스타일이 아닙니다.")
                 serving_style = ServingStyle.SIMPLE
 
-            # 주문 생성
+            # 주문 생성 (한국 시간 기준)
             order = Order(
                 order_id=str(uuid.uuid4())[:8],
                 customer_name=customer_name,
@@ -62,7 +66,7 @@ class OrderProcessor:
                 wine_count=order_data.get("wine_count", 0),
                 champagne_count=order_data.get("champagne_count", 0),
                 delivery_date=order_data.get("delivery_date"),
-                created_at=datetime.now(),
+                created_at=datetime.now(KST),
                 status="confirmed"
             )
 

@@ -8,7 +8,11 @@ import re
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from dateutil import parser as date_parser
+from zoneinfo import ZoneInfo
 from groq import Groq
+
+# 한국 타임존 설정
+KST = ZoneInfo("Asia/Seoul")
 
 
 class DialogManager:
@@ -84,8 +88,8 @@ class DialogManager:
             # 고객 이름과 주문 컨텍스트를 시스템 프롬프트에 추가
             current_system_prompt = self.system_prompt
 
-            # 현재 날짜 추가
-            today = datetime.now()
+            # 현재 날짜 추가 (한국 시간 기준)
+            today = datetime.now(KST)
             tomorrow = today + timedelta(days=1)
             current_system_prompt += f"\n\n**오늘 날짜:** {today.strftime('%Y년 %m월 %d일')} ({today.strftime('%Y-%m-%d')})\n"
             current_system_prompt += f"**내일 날짜:** {tomorrow.strftime('%Y년 %m월 %d일')} ({tomorrow.strftime('%Y-%m-%d')})\n"
@@ -175,21 +179,27 @@ class DialogManager:
         """
         날짜 문자열을 datetime으로 변환
         '내일', '모레' 등 상대적 표현과 시간 정보도 처리
+        기본 시간은 18:00으로 설정
         """
-        today = datetime.now()
+        today = datetime.now(KST)
         base_date = None
 
-        # 1. 기본 날짜 결정 (시간은 00:00:00으로 초기화)
+        # 1. 기본 날짜 결정 (기본 시간은 18:00으로 설정, 한국 타임존 유지)
         if "모레" in date_str:
-            base_date = today.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=2)
+            base_date = today.replace(hour=18, minute=0, second=0, microsecond=0) + timedelta(days=2)
         elif "내일" in date_str:
-            base_date = today.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            base_date = today.replace(hour=18, minute=0, second=0, microsecond=0) + timedelta(days=1)
         elif "오늘" in date_str:
-            base_date = today.replace(hour=0, minute=0, second=0, microsecond=0)
+            base_date = today.replace(hour=18, minute=0, second=0, microsecond=0)
         else:
             # 특정 날짜 형식 시도
             try:
-                base_date = date_parser.parse(date_str, fuzzy=True)
+                parsed = date_parser.parse(date_str, fuzzy=True)
+                # 파싱된 날짜의 시간이 00:00이면 18:00으로 설정
+                if parsed.hour == 0 and parsed.minute == 0:
+                    base_date = parsed.replace(hour=18, minute=0, second=0, microsecond=0)
+                else:
+                    base_date = parsed
             except:
                 return None
 
@@ -225,7 +235,7 @@ class DialogManager:
                         minute = int(match.group(2))
                 break
 
-        # 3. 시간 정보가 있으면 적용
+        # 3. 시간 정보가 명시적으로 있으면 적용 (없으면 기본값 18:00 유지)
         if hour is not None:
             base_date = base_date.replace(hour=hour, minute=minute)
 

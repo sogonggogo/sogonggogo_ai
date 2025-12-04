@@ -7,11 +7,10 @@
 ```
 sogonggogo_ai/
 ├── ai_module/                        # 핵심 AI 모듈
-│   ├── conversation/                 # 대화 관리
-│   │   ├── dialog_manager.py        # Groq API 대화 관리자
-│   │   └── system_prompt.txt        # 시스템 프롬프트
-│   └── voice/                        # 음성 인식
-│       └── speech_recognizer.py     # Groq Whisper API
+│   └── conversation/                 # 대화 관리
+│       ├── dialog_manager.py        # Groq API 대화 관리자
+│       ├── order_processor.py       # 주문 처리
+│       └── system_prompt.txt        # 시스템 프롬프트
 │
 ├── api/                              # FastAPI 서버
 │   ├── app/
@@ -23,8 +22,7 @@ sogonggogo_ai/
 │   └── README.md
 │
 ├── test/                             # 테스트 스크립트
-│   ├── test_text_chat.py            # 텍스트 채팅 테스트
-│   └── test_voice_chat.py           # 음성 채팅 테스트
+│   └── test_text_chat.py            # 텍스트 채팅 테스트
 │
 ├── .env                              # 환경 변수 (GROQ_API_KEY)
 ├── API_SPEC.md                       # API 명세서
@@ -70,9 +68,6 @@ print(response)  # "무슨 기념일인가요?"
 ```bash
 # 텍스트 챗봇 테스트
 python test/test_text_chat.py
-
-# 음성 챗봇 테스트 (Groq Whisper API)
-python test/test_voice_chat.py
 ```
 
 ### 5. API 서버 실행
@@ -92,9 +87,6 @@ python run.py
 - **모델**: Llama 3.3 70B Versatile
 - **제공**: Groq API (클라우드 기반)
 
-### 음성 인식
-- **처리**: 프론트엔드 (Web Speech API 또는 기타)
-- **백엔드**: 텍스트 입력만 처리
 
 
 ## 📋 메뉴 정보
@@ -161,8 +153,7 @@ python run.py
 
 ## 기술 스택
 - **Backend**: FastAPI, Pydantic, Python 3.11
-- **AI**: Groq API (Llama 3.3, Whisper v3 Turbo)
-- **Audio**: PyAudio (음성 입력)
+- **AI**: Groq API (Llama 3.3 70B Versatile)
 - **Utils**: python-dateutil (날짜 파싱)
 
 ## 📡 API 아키텍처
@@ -175,7 +166,7 @@ python run.py
 
 ### 데이터 흐름
 ```
-프론트엔드 → 음성 인식 (Web Speech API) → 텍스트 변환
+프론트엔드 → 텍스트 입력
     ↓
 FastAPI 서버 → 텍스트 수신
     ↓

@@ -1,6 +1,6 @@
-# Dinner Bot Voice API
+# Dinner Bot Chat API
 
-음성 주문 시스템 FastAPI 서버
+디너 주문 시스템 FastAPI 서버
 
 ## 폴더 구조
 
