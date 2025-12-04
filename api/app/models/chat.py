@@ -16,6 +16,12 @@ class StartChatResponse(BaseModel):
     greeting: str
 
 
+class ChatMessageRequest(BaseModel):
+    """채팅 메시지 요청"""
+    session_id: str
+    text: str
+
+
 class ChatMessageResponse(BaseModel):
     """채팅 메시지 응답"""
     text: str

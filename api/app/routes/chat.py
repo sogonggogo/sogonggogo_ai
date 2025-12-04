@@ -1,13 +1,12 @@
 """
 Chat API Routes
 """
-import os
-import tempfile
-from fastapi import APIRouter, File, UploadFile, HTTPException, Form
+from fastapi import APIRouter, HTTPException
 
 from ..models.chat import (
     StartChatRequest,
     StartChatResponse,
+    ChatMessageRequest,
     ChatMessageResponse
 )
 from ..services.session_manager import session_manager
@@ -38,67 +37,55 @@ async def start_chat(request: StartChatRequest):
 
 
 @router.post("/message", response_model=ChatMessageResponse)
-async def send_message(
-    session_id: str = Form(...),
-    audio: UploadFile = File(...)
-):
+async def send_message(request: ChatMessageRequest):
     """
-    음성 메시지 전송
+    텍스트 메시지 전송
     Args:
-        session_id: 세션 ID
-        audio: 오디오 파일 (WAV, MP3 등)
+        request: 세션 ID 및 텍스트 메시지
     Returns:
         AI 응답 텍스트 및 주문 데이터
     """
     # 세션 확인
-    session = session_manager.get_session(session_id)
+    session = session_manager.get_session(request.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
 
-    speech_recognizer = session["speech_recognizer"]
     dialog_manager = session["dialog_manager"]
 
     try:
-        # 오디오 파일을 임시 파일로 저장
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
-            content = await audio.read()
-            temp_audio.write(content)
-            temp_audio_path = temp_audio.name
+        user_text = request.text.strip()
 
-        print(f"[세션 {session_id}] 오디오 파일 수신: {audio.filename}")
+        if not user_text:
+            raise HTTPException(status_code=400, detail="텍스트가 비어있습니다.")
 
-        # 음성 인식
-        recognized_text = speech_recognizer.recognize_from_file(temp_audio_path)
-
-        # 임시 파일 삭제
-        os.unlink(temp_audio_path)
-
-        if not recognized_text:
-            raise HTTPException(status_code=400, detail="음성을 인식할 수 없습니다.")
-
-        print(f"[세션 {session_id}] 인식된 텍스트: {recognized_text}")
+        print(f"[세션 {request.session_id}] 사용자 입력: {user_text}")
 
         # AI 응답 생성
-        response_text, order_data = dialog_manager.process_user_input(recognized_text)
-
-        print(f"[세션 {session_id}] AI 응답: {response_text}")
-
-        # 대화 히스토리 저장
-        session["conversation_history"].append({
-            "user": recognized_text,
-            "assistant": response_text,
-            "order_data": order_data
-        })
+        response_text, order_data = dialog_manager.process_user_input(user_text)
 
         # 주문 완료 여부 확인
         is_completed = False
         if order_data and "delivery_date" in order_data and order_data["delivery_date"]:
             is_completed = True
-            print(f"[세션 {session_id}] 주문 완료!")
+            print(f"[세션 {request.session_id}] 주문 완료!")
+
+            # 주문 완료 시 응답이 비어있으면 완료 메시지 추가
+            if not response_text or response_text.strip() == "":
+                customer_name = session.get("customer_name", "고객")
+                response_text = f"{customer_name}님, 주문이 완료되었습니다! 주문하신 내용대로 배송해드리겠습니다. 감사합니다."
+
+        print(f"[세션 {request.session_id}] AI 응답: {response_text}")
+
+        # 대화 히스토리 저장
+        session["conversation_history"].append({
+            "user": user_text,
+            "assistant": response_text,
+            "order_data": order_data
+        })
 
         return ChatMessageResponse(
             text=response_text,
-            recognized_text=recognized_text,
+            recognized_text=user_text,
             order_data=order_data,
             is_completed=is_completed
         )

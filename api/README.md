@@ -30,9 +30,9 @@ api/
 - Request: `{ "customer_name": "김동환" }`
 - Response: `{ "session_id": "...", "greeting": "..." }`
 
-### 2. 음성 메시지 전송
+### 2. 텍스트 메시지 전송
 - **POST** `/api/chat/message`
-- Request: FormData (session_id, audio)
+- Request: `{ "session_id": "...", "text": "맛있는 디너 추천해주세요" }`
 - Response: `{ "text": "...", "recognized_text": "...", "order_data": {...}, "is_completed": false }`
 
 ### 3. 대화 초기화

@@ -3,6 +3,7 @@ FastAPI Main Application
 """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from .routes import chat_router
@@ -17,10 +18,10 @@ async def lifespan(app: FastAPI):
     """앱 생명주기 관리"""
     # 시작 시 실행
     print("\n" + "="*60)
-    print("  Dinner Bot Voice API Server Starting...")
+    print("  Dinner Bot Text API Server Starting...")
     print("="*60)
     print("[알림] Groq API 사용")
-    print("       - 음성 인식: Groq Whisper API")
+    print("       - 텍스트 입력: 프론트엔드에서 처리")
     print("       - 대화 모델: Llama 3.3 70B")
     print("="*60 + "\n")
 
@@ -32,10 +33,19 @@ async def lifespan(app: FastAPI):
 
 # FastAPI 앱 초기화
 app = FastAPI(
-    title="Dinner Bot Voice API",
-    description="음성 주문 시스템 API",
+    title="Dinner Bot Text API",
+    description="텍스트 기반 주문 시스템 API",
     version="1.0.0",
     lifespan=lifespan
+)
+
+# CORS 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 프로덕션에서는 특정 도메인으로 제한
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # 라우터 등록
@@ -46,11 +56,11 @@ app.include_router(chat_router)
 async def root():
     """루트 엔드포인트"""
     return {
-        "message": "Dinner Bot Voice API Server",
+        "message": "Dinner Bot Text API Server",
         "version": "1.0.0",
         "endpoints": {
             "start_chat": "POST /api/chat/start",
-            "send_message": "POST /api/chat/message",
+            "send_message": "POST /api/chat/message (텍스트 입력)",
             "reset_chat": "POST /api/chat/reset/{session_id}"
         }
     }

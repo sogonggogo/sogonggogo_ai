@@ -93,8 +93,8 @@ python run.py
 - **제공**: Groq API (클라우드 기반)
 
 ### 음성 인식
-- **모델**: Whisper Large v3 Turbo
-- **제공**: Groq API (클라우드 기반)
+- **처리**: 프론트엔드 (Web Speech API 또는 기타)
+- **백엔드**: 텍스트 입력만 처리
 
 
 ## 📋 메뉴 정보
@@ -169,15 +169,15 @@ python run.py
 
 ### 엔드포인트
 1. **POST /api/chat/start** - 대화 시작, 세션 생성
-2. **POST /api/chat/message** - 음성 파일 전송, AI 응답 수신
+2. **POST /api/chat/message** - 텍스트 메시지 전송, AI 응답 수신
 3. **POST /api/chat/reset/{session_id}** - 세션 초기화
 4. **GET /api/health** - 서버 상태 확인
 
 ### 데이터 흐름
 ```
-프론트엔드 → 음성 녹음 → FormData 전송
+프론트엔드 → 음성 인식 (Web Speech API) → 텍스트 변환
     ↓
-FastAPI 서버 → Groq Whisper API (STT)
+FastAPI 서버 → 텍스트 수신
     ↓
 Dialog Manager → Groq Llama API (대화)
     ↓

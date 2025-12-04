@@ -4,7 +4,6 @@ Session Manager Service
 import uuid
 from typing import Dict, Optional
 
-from ai_module.voice.speech_recognizer import SpeechRecognizer
 from ai_module.conversation.dialog_manager import DialogManager
 
 
@@ -25,9 +24,6 @@ class SessionManager:
         # 세션 ID 생성
         session_id = str(uuid.uuid4())
 
-        # 음성 인식기 초기화
-        speech_recognizer = SpeechRecognizer()
-
         # 대화 관리자 초기화
         dialog_manager = DialogManager()
 
@@ -37,7 +33,6 @@ class SessionManager:
         # 세션 저장
         self.sessions[session_id] = {
             "customer_name": customer_name,
-            "speech_recognizer": speech_recognizer,
             "dialog_manager": dialog_manager,
             "conversation_history": []
         }
