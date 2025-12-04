@@ -1,31 +1,33 @@
-name: Build & Push :release (ai)
+name: Build & Push dinner_service image
 
 on:
   push:
     branches: [ "main" ]
 
-env:
-  IMAGE_NAME: dinner_service   # 서비스 이름 구분용
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Prepare image name (lowercase)
-        run: |
-          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
-          echo "IMAGE=$IMAGE"
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log in to GHCR
-        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
-
-      - name: Build image
-        run: docker build -t "$IMAGE:release" .
-
-      - name: Push image
-        run: docker push "$IMAGE:release"
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:release

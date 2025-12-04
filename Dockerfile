@@ -3,7 +3,11 @@ FROM python:3.11-slim
 
 # 시스템 기본 패키지(필요 최소)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential && \
+    build-essential \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -22,5 +26,5 @@ ENV APP_MODULE=api.app.main:app
 
 EXPOSE 8000
 
-# uvicorn으로 실행 (FastAPI/Starlette/ASGI 호환)
+# uvicorn으로 실행 (FastAPI/ASGI 호환)
 CMD ["sh", "-c", "python -m uvicorn ${APP_MODULE} --host 0.0.0.0 --port ${PORT}"]
