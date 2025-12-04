@@ -3,7 +3,6 @@ FastAPI Main Application
 """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from .routes import chat_router
@@ -37,15 +36,6 @@ app = FastAPI(
     description="텍스트 기반 주문 시스템 API",
     version="1.0.0",
     lifespan=lifespan
-)
-
-# CORS 설정
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 프로덕션에서는 특정 도메인으로 제한
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
 # 라우터 등록
