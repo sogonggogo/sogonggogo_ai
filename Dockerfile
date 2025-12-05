@@ -10,6 +10,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
+
+ # 타임존 설정
+ENV TZ=Asia/Seoul
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 WORKDIR /app
 
 # requirements가 있다면 먼저 복사/설치해서 캐시 극대화
