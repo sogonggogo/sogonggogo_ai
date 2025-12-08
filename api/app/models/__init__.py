@@ -1,18 +1,16 @@
 """
 Models Package
 """
-from .chat import (
+from .schemas import (
     StartChatRequest,
     StartChatResponse,
     ChatMessageRequest,
     ChatMessageResponse,
-    ErrorResponse
 )
 
 __all__ = [
     "StartChatRequest",
     "StartChatResponse",
     "ChatMessageRequest",
-    "ChatMessageResponse",
-    "ErrorResponse"
+    "ChatMessageResponse"
 ]

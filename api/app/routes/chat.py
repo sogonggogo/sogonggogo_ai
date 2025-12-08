@@ -4,7 +4,7 @@ Chat API Routes
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 
-from ..models.chat import (
+from ..models.schemas import (
     StartChatRequest,
     StartChatResponse,
     ChatMessageRequest,

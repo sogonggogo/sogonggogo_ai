@@ -28,9 +28,3 @@ class ChatMessageResponse(BaseModel):
     recognized_text: Optional[str] = None
     order_data: Optional[Dict] = None
     is_completed: bool = False
-
-
-class ErrorResponse(BaseModel):
-    """에러 응답"""
-    error: str
-    detail: Optional[str] = None

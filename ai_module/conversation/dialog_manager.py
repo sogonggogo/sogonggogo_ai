@@ -33,7 +33,7 @@ class DialogManager:
         # Groq 클라이언트 초기화
         self.client = Groq(api_key=self.api_key)
 
-        # 사용할 모델 (Llama 3.3 70B - 가장 강력함)
+        # 사용할 모델 (Llama 3.3 70B)
         self.model_name = "llama-3.3-70b-versatile"
 
         self.conversation_history: List[Dict[str, str]] = []
@@ -246,7 +246,7 @@ class DialogManager:
         self.order_context.update(order_data)
 
     def get_order_summary(self) -> str:
-        """현재 주문 요약 반환"""
+        """현재 주문 요약 반환 - 모든 품목을 동적으로 처리"""
         if not self.order_context:
             return "아직 주문 정보가 없습니다."
 
@@ -258,39 +258,27 @@ class DialogManager:
         if "serving_style" in self.order_context:
             summary_parts.append(f"서빙: {self.order_context['serving_style']} 스타일")
 
-        # 모든 디너 공통 - 스테이크
-        if "steak_count" in self.order_context and self.order_context["steak_count"] > 0:
-            summary_parts.append(f"스테이크: {self.order_context['steak_count']}개")
+        # 모든 품목을 동적으로 처리
+        item_display = {
+            "wine_count": ("와인", "잔"),
+            "steak_count": ("스테이크", "개"),
+            "napkin_count": ("냅킨", "개"),
+            "coffee_cup_count": ("커피", "잔"),
+            "salad_count": ("샐러드", "인분"),
+            "egg_scramble_count": ("에그 스크램블", "인분"),
+            "bacon_count": ("베이컨", "인분"),
+            "bread_count": ("빵", "개"),
+            "champagne_count": ("샴페인", "병"),
+            "baguette_count": ("바게트빵", "개"),
+            "coffee_pot_count": ("커피 포트", "개"),
+        }
 
-        # Valentine Dinner 항목
-        if "wine_count" in self.order_context and self.order_context["wine_count"] > 0:
-            summary_parts.append(f"와인: {self.order_context['wine_count']}잔")
-        if "napkin_count" in self.order_context and self.order_context["napkin_count"] > 0:
-            summary_parts.append(f"냅킨: {self.order_context['napkin_count']}개")
+        # 품목 추가 (0보다 큰 것만)
+        for field, (name, unit) in item_display.items():
+            if field in self.order_context and self.order_context[field] > 0:
+                summary_parts.append(f"{name}: {self.order_context[field]}{unit}")
 
-        # French Dinner 항목
-        if "coffee_cup_count" in self.order_context and self.order_context["coffee_cup_count"] > 0:
-            summary_parts.append(f"커피: {self.order_context['coffee_cup_count']}잔")
-        if "salad_count" in self.order_context and self.order_context["salad_count"] > 0:
-            summary_parts.append(f"샐러드: {self.order_context['salad_count']}인분")
-
-        # English Dinner 항목
-        if "egg_scramble_count" in self.order_context and self.order_context["egg_scramble_count"] > 0:
-            summary_parts.append(f"에그 스크램블: {self.order_context['egg_scramble_count']}인분")
-        if "bacon_count" in self.order_context and self.order_context["bacon_count"] > 0:
-            summary_parts.append(f"베이컨: {self.order_context['bacon_count']}인분")
-        if "bread_count" in self.order_context and self.order_context["bread_count"] > 0:
-            summary_parts.append(f"빵: {self.order_context['bread_count']}개")
-
-        # Champagne Festival Dinner 항목
-        if "champagne_count" in self.order_context and self.order_context["champagne_count"] > 0:
-            summary_parts.append(f"샴페인: {self.order_context['champagne_count']}병")
-        if "baguette_count" in self.order_context:
-            summary_parts.append(f"바게트빵: {self.order_context['baguette_count']}개")
-        if "coffee_pot_count" in self.order_context and self.order_context["coffee_pot_count"] > 0:
-            summary_parts.append(f"커피: {self.order_context['coffee_pot_count']}포트")
-
-        # 인원수 정보
+        # 인원수 정보 (Champagne Festival Dinner용)
         if "serves_count" in self.order_context:
             summary_parts.append(f"{self.order_context['serves_count']}인분")
 
